@@ -43,10 +43,10 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_quant_4ch.tflite"
+        private val MODEL_FILE_PATH = "food_model_quant_nnapi_3ch.tflite"
 
-        private val IMAGE_WIDTH = 128
-        private val IMAGE_HEIGHT = 128
+        private val IMAGE_WIDTH = 256
+        private val IMAGE_HEIGHT = 256
         private val IMAGE_CHANNEL = 4
 
         val IMAGE_BYTES_LENGTH = IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNEL
@@ -72,7 +72,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
     val model = loadModelFile(assetManager, MODEL_FILE_PATH)
 
     val options = Interpreter.Options().also {
-        //        it.setUseNNAPI(true)
+        it.setUseNNAPI(true)
     }
 
     data class Request(val bitmap: Bitmap, val callbak: Callback)
@@ -85,8 +85,12 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     model,
                     options)
 
-            val inputBuffer = ByteBuffer
+            val imageByteBuffer = ByteBuffer
                     .allocateDirect(IMAGE_BYTES_LENGTH)
+                    .order(ByteOrder.nativeOrder())
+
+            val inputBuffer = ByteBuffer
+                    .allocateDirect(IMAGE_WIDTH * IMAGE_HEIGHT * 3)
                     .order(ByteOrder.nativeOrder())
 
             val resultBuffer = ByteBuffer
@@ -101,8 +105,16 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
                 val scaledBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, false)
 
-                inputBuffer.rewind()
-                scaledBitmap.copyPixelsToBuffer(inputBuffer)
+                imageByteBuffer.rewind()
+                scaledBitmap.copyPixelsToBuffer(imageByteBuffer)
+
+                imageByteBuffer.rewind()
+
+                for (index in 0 until IMAGE_BYTES_LENGTH) {
+                    if ((index % 4) != 3) {
+                        inputBuffer.put(imageByteBuffer[index])
+                    }
+                }
 
                 // https://github.com/CyberAgent/android-gpuimage/issues/24
                 if (scaledBitmap !== bitmap) {
