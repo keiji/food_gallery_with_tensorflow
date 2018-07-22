@@ -20,7 +20,14 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.os.Debug
 import android.util.Log
-import org.tensorflow.contrib.android.TensorFlowInferenceInterface
+import org.tensorflow.lite.Interpreter
+import java.io.FileInputStream
+import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
+
 
 class ImageRecognizer(assetManager: AssetManager) {
 
@@ -28,7 +35,7 @@ class ImageRecognizer(assetManager: AssetManager) {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_4ch.pb"
+        private val MODEL_FILE_PATH = "food_model_4ch.tflite"
 
         private val IMAGE_WIDTH = 128
         private val IMAGE_HEIGHT = 128
@@ -41,22 +48,45 @@ class ImageRecognizer(assetManager: AssetManager) {
         }
     }
 
-    val tfInference: TensorFlowInferenceInterface = TensorFlowInferenceInterface(
-            assetManager.open(MODEL_FILE_PATH))
+    @Throws(IOException::class)
+    private fun loadModelFile(assets: AssetManager, modelFileName: String): MappedByteBuffer {
+        val fileDescriptor = assets.openFd(modelFileName)
+        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
 
-    val resultArray = FloatArray(1)
+        val fileChannel = inputStream.channel
+        val startOffset = fileDescriptor.startOffset
+        val declaredLength = fileDescriptor.declaredLength
+
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    }
+
+    val tfInference: Interpreter
+
+    init {
+        tfInference = Interpreter(loadModelFile(assetManager, MODEL_FILE_PATH)).apply {
+//            setUseNNAPI(true)
+        }
+    }
+
+    val inputBuffer = ByteBuffer
+            .allocateDirect(IMAGE_BYTES_LENGTH * 4)
+            .order(ByteOrder.nativeOrder())
+
+    val resultArray = Array(1, { FloatArray(1) })
 
     fun recognize(imageByteArray: ByteArray): Float {
-        val start = Debug.threadCpuTimeNanos()
 
-        tfInference.feed("input", imageByteArray, IMAGE_BYTES_LENGTH.toLong())
-        tfInference.run(arrayOf("result"))
-        tfInference.fetch("result", resultArray)
+        imageByteArray.forEach { inputBuffer.putFloat(it.toInt().and(0xFF).toFloat()) }
+        inputBuffer.rewind()
+
+        val start = Debug.threadCpuTimeNanos()
+        tfInference.run(inputBuffer, resultArray)
+        inputBuffer.rewind()
 
         val elapsed = Debug.threadCpuTimeNanos() - start
         Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
 
-        return resultArray[0]
+        return resultArray[0][0]
     }
 
     fun stop() {
