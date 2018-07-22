@@ -24,6 +24,7 @@ import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
 class ImageRecognizer(assetManager: AssetManager) {
@@ -58,19 +59,26 @@ class ImageRecognizer(assetManager: AssetManager) {
     }
 
     val options = Interpreter.Options().also {
-        //        it.setUseNNAPI(true)
+        it.setUseNNAPI(true)
     }
+
     val tfInference: Interpreter = Interpreter(
             loadModelFile(assetManager, MODEL_FILE_PATH),
             options)
 
-    val resultArray = Array(1, { ByteArray(1) })
+    val inputBuffer = ByteBuffer
+            .allocateDirect(IMAGE_BYTES_LENGTH * 4)
+            .order(ByteOrder.nativeOrder())
 
-    fun recognize(imageByteBuffer: ByteBuffer): Float {
+    val resultArray = Array(1, { FloatArray(1) })
+
+    fun recognize(byteBuffer: ByteBuffer): Float {
+        byteBuffer.array().forEach { inputBuffer.putFloat(it.toInt().and(0xFF).toFloat()) }
+        inputBuffer.rewind()
 
         val start = Debug.threadCpuTimeNanos()
-        tfInference.run(imageByteBuffer, resultArray)
-        imageByteBuffer.rewind()
+        tfInference.run(inputBuffer, resultArray)
+        inputBuffer.rewind()
 
         val elapsed = Debug.threadCpuTimeNanos() - start
         Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
