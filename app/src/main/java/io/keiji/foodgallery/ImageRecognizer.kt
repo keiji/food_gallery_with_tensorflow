@@ -35,7 +35,7 @@ class ImageRecognizer(assetManager: AssetManager) {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_4ch.tflite"
+        private val MODEL_FILE_PATH = "food_model_quant_4ch.tflite"
 
         private val IMAGE_WIDTH = 128
         private val IMAGE_HEIGHT = 128
@@ -64,29 +64,22 @@ class ImageRecognizer(assetManager: AssetManager) {
 
     init {
         tfInference = Interpreter(loadModelFile(assetManager, MODEL_FILE_PATH)).apply {
-//            setUseNNAPI(true)
+            //            setUseNNAPI(true)
         }
     }
 
-    val inputBuffer = ByteBuffer
-            .allocateDirect(IMAGE_BYTES_LENGTH * 4)
-            .order(ByteOrder.nativeOrder())
-
-    val resultArray = Array(1, { FloatArray(1) })
+    val resultArray = Array(1, { ByteArray(1) })
 
     fun recognize(imageByteArray: ByteArray): Float {
 
-        imageByteArray.forEach { inputBuffer.putFloat(it.toInt().and(0xFF).toFloat()) }
-        inputBuffer.rewind()
-
         val start = Debug.threadCpuTimeNanos()
-        tfInference.run(inputBuffer, resultArray)
-        inputBuffer.rewind()
+
+        tfInference.run(imageByteArray, resultArray)
 
         val elapsed = Debug.threadCpuTimeNanos() - start
         Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
 
-        return resultArray[0][0]
+        return resultArray[0][0].toInt().and(0xFF) / 255.0F
     }
 
     fun stop() {
