@@ -54,7 +54,7 @@ class ImageRecognizer(assetManager: AssetManager) {
         tfInference.fetch("result", resultArray)
 
         val elapsed = Debug.threadCpuTimeNanos() - start
-        Log.d(TAG, "Elapsed: %d ns".format(elapsed))
+        Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
 
         return resultArray[0]
     }
