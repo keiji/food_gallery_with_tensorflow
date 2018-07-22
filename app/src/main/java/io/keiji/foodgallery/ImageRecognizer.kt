@@ -32,7 +32,7 @@ class ImageRecognizer(assetManager: AssetManager) {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_4ch.tflite"
+        private val MODEL_FILE_PATH = "food_model_quant_4ch.tflite"
 
         private val IMAGE_WIDTH = 128
         private val IMAGE_HEIGHT = 128
@@ -75,7 +75,7 @@ class ImageRecognizer(assetManager: AssetManager) {
         val elapsed = Debug.threadCpuTimeNanos() - start
         Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
 
-        return resultArray[0][0]
+        return resultArray[0][0].toInt().and(0xFF) / 255.0F
     }
 
     fun stop() {
