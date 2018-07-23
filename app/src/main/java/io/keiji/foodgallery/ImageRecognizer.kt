@@ -49,7 +49,7 @@ class ImageRecognizer(assetManager: AssetManager) {
     fun recognize(imageByteArray: ByteArray): Float {
         val start = Debug.threadCpuTimeNanos()
 
-        tfInference.feed("input", imageByteArray, imageByteArray.size.toLong())
+        tfInference.feed("input", imageByteArray, IMAGE_BYTES_LENGTH.toLong())
         tfInference.run(arrayOf("result"))
         tfInference.fetch("result", resultArray)
 
