@@ -225,12 +225,14 @@ class MainActivity : AppCompatActivity() {
                     scaledBitmap.copyPixelsToBuffer(imageByteBuffer)
                     scaledBitmap.recycle()
 
-                    val result = imageRecognizer.recognize(imageByteBuffer.array())
-                    imageByteBuffer.clear()
+                    try {
+                        val result = imageRecognizer.recognize(imageByteBuffer.array())
+                        cacheBin.put(path, result)
 
-                    cacheBin.put(path, result)
-
-                    observer.onSuccess(result)
+                        observer.onSuccess(result)
+                    } finally {
+                        imageByteBuffer.clear()
+                    }
                 }
             }
         }
