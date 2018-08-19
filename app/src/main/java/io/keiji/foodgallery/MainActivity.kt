@@ -223,7 +223,11 @@ class MainActivity : AppCompatActivity() {
 
                 synchronized(imageByteBuffer) {
                     scaledBitmap.copyPixelsToBuffer(imageByteBuffer)
-                    scaledBitmap.recycle()
+
+                    // https://github.com/CyberAgent/android-gpuimage/issues/24
+                    if (bitmap != scaledBitmap) {
+                        scaledBitmap.recycle()
+                    }
 
                     try {
                         val result = imageRecognizer.recognize(imageByteBuffer.array())
