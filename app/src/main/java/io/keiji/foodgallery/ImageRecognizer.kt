@@ -21,6 +21,7 @@ import android.graphics.Bitmap
 import android.os.Debug
 import android.util.Log
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface
+import java.nio.ByteBuffer
 
 class ImageRecognizer(assetManager: AssetManager) {
 
@@ -46,10 +47,10 @@ class ImageRecognizer(assetManager: AssetManager) {
 
     val resultArray = FloatArray(1)
 
-    fun recognize(imageByteArray: ByteArray): Float {
+    fun recognize(byteBuffer: ByteBuffer): Float {
         val start = Debug.threadCpuTimeNanos()
 
-        tfInference.feed("input", imageByteArray, IMAGE_BYTES_LENGTH.toLong())
+        tfInference.feed("input", byteBuffer, IMAGE_BYTES_LENGTH.toLong())
         tfInference.run(arrayOf("result"))
         tfInference.fetch("result", resultArray)
 

@@ -40,6 +40,7 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class MainActivity : AppCompatActivity() {
 
@@ -124,7 +125,10 @@ class MainActivity : AppCompatActivity() {
 
         val pathIndex: Int = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
 
-        val imageByteBuffer: ByteBuffer = ByteBuffer.allocate(ImageRecognizer.IMAGE_BYTES_LENGTH)
+        val imageByteBuffer: ByteBuffer = ByteBuffer
+                .allocateDirect(ImageRecognizer.IMAGE_BYTES_LENGTH).also {
+                    it.order(ByteOrder.nativeOrder())
+                }
 
         val cacheBin: HashMap<String, Float> = HashMap()
 
@@ -223,6 +227,7 @@ class MainActivity : AppCompatActivity() {
 
                 synchronized(imageByteBuffer) {
                     scaledBitmap.copyPixelsToBuffer(imageByteBuffer)
+                    imageByteBuffer.rewind();
 
                     // https://github.com/CyberAgent/android-gpuimage/issues/24
                     if (bitmap != scaledBitmap) {
@@ -230,7 +235,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     try {
-                        val result = imageRecognizer.recognize(imageByteBuffer.array())
+                        val result = imageRecognizer.recognize(imageByteBuffer)
                         cacheBin.put(path, result)
 
                         observer.onSuccess(result)
