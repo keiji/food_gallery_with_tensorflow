@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this,
                         Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
-                    arrayOf(elements = Manifest.permission.READ_EXTERNAL_STORAGE),
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                     REQUEST_CODE_PERMISSION)
             return
         }
@@ -173,17 +173,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-            val imageView: ImageView
-            val progress: ProgressBar
+            val imageView: ImageView = itemView.findViewById(R.id.image_view)
+            val progress: ProgressBar = itemView.findViewById(R.id.progress)
 
             var disposable: Disposable? = null
 
             var tag: String? = null
-
-            init {
-                imageView = itemView.findViewById(R.id.image_view)
-                progress = itemView.findViewById(R.id.progress)
-            }
         }
 
         private inner class LoadPhoto(
