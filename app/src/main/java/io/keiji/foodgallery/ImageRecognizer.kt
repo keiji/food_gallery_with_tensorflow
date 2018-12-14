@@ -64,7 +64,7 @@ class ImageRecognizer(assetManager: AssetManager) {
             loadModelFile(assetManager, MODEL_FILE_PATH),
             options)
 
-    val resultArray = Array(1, { FloatArray(1) })
+    val resultArray = Array(1, { ByteArray(1) })
 
     fun recognize(imageByteBuffer: ByteBuffer): Float {
 
