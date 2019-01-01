@@ -24,6 +24,7 @@ import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 
 class ImageRecognizer(assetManager: AssetManager) {
@@ -32,10 +33,10 @@ class ImageRecognizer(assetManager: AssetManager) {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_quant_4ch.tflite"
+        private val MODEL_FILE_PATH = "food_model_quant_nnapi_3ch.tflite"
 
-        private val IMAGE_WIDTH = 128
-        private val IMAGE_HEIGHT = 128
+        private val IMAGE_WIDTH = 256
+        private val IMAGE_HEIGHT = 256
         private val IMAGE_CHANNEL = 4
 
         val IMAGE_BYTES_LENGTH = IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNEL
@@ -65,16 +66,25 @@ class ImageRecognizer(assetManager: AssetManager) {
             loadModelFile(assetManager, MODEL_FILE_PATH),
             options)
 
-    val resultArray = Array(1, { FloatArray(1) })
+    val inputByteBuffer: ByteBuffer = ByteBuffer
+            .allocateDirect(IMAGE_WIDTH * IMAGE_HEIGHT * 3)
+            .order(ByteOrder.nativeOrder())
+    val resultArray = Array(1, { ByteArray(1) })
 
     fun recognize(imageByteBuffer: ByteBuffer): Float {
+        for (index in 0 until IMAGE_BYTES_LENGTH) {
+            if ((index % 4) != 3) {
+                inputByteBuffer.put(imageByteBuffer[index])
+            }
+        }
+        inputByteBuffer.rewind()
 
         val start = Debug.threadCpuTimeNanos()
-        tfInference.run(imageByteBuffer, resultArray)
-        imageByteBuffer.rewind()
-
+        tfInference.run(inputByteBuffer, resultArray)
         val elapsed = Debug.threadCpuTimeNanos() - start
-        Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
+        Log.d(TAG, elapsed.toString())
+
+        inputByteBuffer.clear()
 
         return resultArray[0][0].toInt().and(0xFF) / 255.0F
     }
