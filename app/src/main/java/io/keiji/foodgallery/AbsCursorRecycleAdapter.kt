@@ -5,7 +5,7 @@ import android.database.ContentObserver
 import android.database.Cursor
 import android.os.Handler
 import android.provider.MediaStore
-import android.support.v7.widget.RecyclerView
+import androidx.recyclerview.widget.RecyclerView
 
 /**
  * Wasabeef - RecyclerViewでCursorを使う.
