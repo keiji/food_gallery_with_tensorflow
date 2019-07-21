@@ -1,7 +1,7 @@
 package io.keiji.foodgallery
 
 /*
-Copyright 2018 Keiji ARIYAMA
+Copyright 2018-2019 Keiji ARIYAMA
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,15 +19,23 @@ limitations under the License.
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.os.Debug
-import android.util.Log
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import java.util.concurrent.Executors
 
-class ImageRecognizer(assetManager: AssetManager) {
+class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     companion object {
         val TAG = ImageRecognizer::class.java.simpleName
@@ -46,6 +54,11 @@ class ImageRecognizer(assetManager: AssetManager) {
         }
     }
 
+    private val dispatcher = Executors
+            .newFixedThreadPool(4)
+            .asCoroutineDispatcher()
+    private val coroutineScope = CoroutineScope(dispatcher)
+
     @Throws(IOException::class)
     private fun loadModelFile(assets: AssetManager, modelFileName: String): ByteBuffer {
         val fileDescriptor = assets.openFd(modelFileName)
@@ -58,34 +71,82 @@ class ImageRecognizer(assetManager: AssetManager) {
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
+    val model = loadModelFile(assetManager, MODEL_FILE_PATH)
+
     val options = Interpreter.Options().also {
         //        it.setUseNNAPI(true)
     }
-    val tfInference: Interpreter = Interpreter(
-            loadModelFile(assetManager, MODEL_FILE_PATH),
-            options)
 
-    val inputBuffer = ByteBuffer
-            .allocateDirect(IMAGE_BYTES_LENGTH * 4)
-            .order(ByteOrder.nativeOrder())
+    data class Request(val bitmap: Bitmap, val callbak: Callback)
 
-    val resultArray = Array(1, { FloatArray(1) })
+    val channel: Channel<Request> = Channel()
 
-    fun recognize(byteBuffer: ByteBuffer): Float {
-        byteBuffer.array().forEach { inputBuffer.putFloat(it.toInt().and(0xFF).toFloat()) }
-        inputBuffer.rewind()
+    val workers = (1..4).map {
+        coroutineScope.launch {
+            val tfInference = Interpreter(
+                    model,
+                    options)
 
-        val start = Debug.threadCpuTimeNanos()
-        tfInference.run(inputBuffer, resultArray)
-        inputBuffer.rewind()
+            val resizedImageBuffer = ByteBuffer
+                    .allocateDirect(IMAGE_BYTES_LENGTH)
+                    .order(ByteOrder.nativeOrder())
 
-        val elapsed = Debug.threadCpuTimeNanos() - start
-        Log.d(TAG, "Elapsed: %,3d ns".format(elapsed))
+            val inputBuffer = ByteBuffer
+                    .allocateDirect(IMAGE_BYTES_LENGTH * 4)
+                    .order(ByteOrder.nativeOrder())
 
-        return resultArray[0][0]
+            val resultBuffer = ByteBuffer
+                    .allocateDirect(4)
+                    .order(ByteOrder.nativeOrder())
+
+            for (request in channel) {
+                val (bitmap, callbak) = request
+                if (bitmap.isRecycled) {
+                    continue
+                }
+
+                val scaledBitmap = resizeToPreferSize(bitmap)
+
+                resizedImageBuffer.rewind()
+                scaledBitmap.copyPixelsToBuffer(resizedImageBuffer)
+
+                inputBuffer.rewind()
+                for (index in (0..IMAGE_BYTES_LENGTH - 1)) {
+                    inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
+                }
+
+                inputBuffer.rewind()
+                resultBuffer.rewind()
+
+                val start = Debug.threadCpuTimeNanos()
+                tfInference.run(inputBuffer, resultBuffer)
+                resultBuffer.rewind()
+
+                val elapsed = Debug.threadCpuTimeNanos() - start
+                val confidence = resultBuffer.getFloat()
+
+                resultBuffer.clear()
+                inputBuffer.clear()
+
+                callbak.onRecognize(confidence)
+            }
+        }
     }
 
-    fun stop() {
-        tfInference.close()
+    @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
+    fun onCreate() {
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+    fun onDestroy() {
+        workers.map { it.cancel() }
+        channel.close()
+        dispatcher.close()
+
+        coroutineScope.cancel()
+    }
+
+    interface Callback {
+        fun onRecognize(confidence: Float)
     }
 }
