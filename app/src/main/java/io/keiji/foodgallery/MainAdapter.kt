@@ -38,8 +38,9 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import java.util.concurrent.Executors
 
-private const val IS_FOOD = 1.0F
-private const val IS_NOT_FOOD = 0.5F
+private const val CONFIDENCE_THRESHOLD = 0.5F
+private const val ALPHA_IS_FOOD = 1.0F
+private const val ALPHA_IS_NOT_FOOD = 0.5F
 
 class MainAdapter(
         val context: Context,
@@ -108,11 +109,22 @@ class MainAdapter(
             private val path: String
     ) {
         val photoPrediction: ObservableField<Float> = ObservableField()
-
         val progressVisibility: ObservableField<Int> = ObservableField()
 
         private var thumbnailLoadingJob: Job? = null
         private var bitmap: Bitmap? = null
+
+        val recognizerCallback: ImageRecognizer.Callback = object : ImageRecognizer.Callback {
+            override fun onRecognize(confidence: Float) {
+                val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
+                    ALPHA_IS_FOOD
+                } else {
+                    ALPHA_IS_NOT_FOOD
+                }
+                photoPrediction.set(alpha)
+                progressVisibility.set(View.GONE)
+            }
+        }
 
         fun recycle() {
             thumbnailLoadingJob?.cancel()
@@ -159,17 +171,7 @@ class MainAdapter(
                                 bitmap
                             }.flowOn(Dispatchers.Main)
                             .map { bitmap ->
-                                channel.send(ImageRecognizer.Request(bitmap, object : ImageRecognizer.Callback {
-                                    override fun onRecognize(confidence: Float) {
-                                        val alpha = if (confidence > 0.5) {
-                                            IS_FOOD
-                                        } else {
-                                            IS_NOT_FOOD
-                                        }
-                                        photoPrediction.set(alpha)
-                                        progressVisibility.set(View.GONE)
-                                    }
-                                }))
+                                channel.send(ImageRecognizer.Request(bitmap, recognizerCallback))
                             }
                     thumbnailLoadingJob = myFlow.launchIn(coroutineScope)
                 }

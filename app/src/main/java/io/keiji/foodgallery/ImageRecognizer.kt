@@ -35,6 +35,8 @@ import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import java.util.concurrent.Executors
 
+private const val NUM_WORKERS = 4
+
 class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     companion object {
@@ -55,7 +57,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
     }
 
     private val dispatcher = Executors
-            .newFixedThreadPool(4)
+            .newFixedThreadPool(NUM_WORKERS)
             .asCoroutineDispatcher()
     private val coroutineScope = CoroutineScope(dispatcher)
 
@@ -81,7 +83,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     val channel: Channel<Request> = Channel()
 
-    val workers = (1..4).map {
+    val workers = (1..NUM_WORKERS).map {
         coroutineScope.launch {
             val tfInference = Interpreter(
                     model,
