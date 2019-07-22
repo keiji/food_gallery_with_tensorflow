@@ -50,10 +50,6 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         private val IMAGE_CHANNEL = 4
 
         val IMAGE_BYTES_LENGTH = IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNEL
-
-        fun resizeToPreferSize(bitmap: Bitmap): Bitmap {
-            return Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, false)
-        }
     }
 
     private val dispatcher = Executors
@@ -107,10 +103,15 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     continue
                 }
 
-                val scaledBitmap = resizeToPreferSize(bitmap)
+                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, false)
 
                 resizedImageBuffer.rewind()
                 scaledBitmap.copyPixelsToBuffer(resizedImageBuffer)
+
+                // https://github.com/CyberAgent/android-gpuimage/issues/24
+                if (scaledBitmap !== bitmap) {
+                    scaledBitmap.recycle()
+                }
 
                 inputBuffer.rewind()
                 for (index in (0..IMAGE_BYTES_LENGTH - 1)) {
