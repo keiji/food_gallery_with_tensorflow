@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
         lifecycle.addObserver(viewModel)
         lifecycle.addObserver(imageRecognizer)
 
-        val adapter = MainAdapter(this, viewModel.mediaPathList, imageRecognizer.channel)
+        val adapter = MainAdapter(this, this, viewModel.mediaPathList, imageRecognizer.channel)
         lifecycle.addObserver(adapter)
 
         layoutManager = GridLayoutManager(this, 2)

@@ -25,8 +25,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.databinding.BindingAdapter
 import androidx.databinding.DataBindingUtil
-import androidx.databinding.ObservableField
 import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
 import androidx.recyclerview.widget.RecyclerView
 import io.keiji.foodgallery.databinding.ListItemImageBinding
@@ -44,6 +44,7 @@ private const val ALPHA_IS_NOT_FOOD = 0.5F
 
 class MainAdapter(
         val context: Context,
+        val lifecycleOwner: LifecycleOwner,
         val mediaPathList: MutableLiveData<ArrayList<String>>,
         val imageRecognizerChannel: Channel<ImageRecognizer.Request>
 ) : RecyclerView.Adapter<MainAdapter.Holder>(), LifecycleObserver {
@@ -94,6 +95,7 @@ class MainAdapter(
 
         fun bind(path: String) {
             binding.viewModel = ItemListBitmapViewModel(dispatcher, coroutineScope, imageRecognizerChannel, path)
+            binding.lifecycleOwner = lifecycleOwner
         }
 
         fun recycle() {
@@ -108,8 +110,8 @@ class MainAdapter(
             private val channel: Channel<ImageRecognizer.Request>,
             private val path: String
     ) {
-        val photoPrediction: ObservableField<Float> = ObservableField()
-        val progressVisibility: ObservableField<Int> = ObservableField()
+        val photoPrediction = MutableLiveData<Float>()
+        val progressVisibility = MutableLiveData<Int>()
 
         private var thumbnailLoadingJob: Job? = null
         private var bitmap: Bitmap? = null
@@ -121,8 +123,8 @@ class MainAdapter(
                 } else {
                     ALPHA_IS_NOT_FOOD
                 }
-                photoPrediction.set(alpha)
-                progressVisibility.set(View.GONE)
+                photoPrediction.postValue(alpha)
+                progressVisibility.postValue(View.GONE)
             }
         }
 
@@ -158,7 +160,7 @@ class MainAdapter(
                         return
                     }
 
-                    progressVisibility.set(View.VISIBLE)
+                    progressVisibility.postValue(View.VISIBLE)
 
                     val myFlow = flow {
                         bitmap = BitmapFactory.decodeFile(path, options)
