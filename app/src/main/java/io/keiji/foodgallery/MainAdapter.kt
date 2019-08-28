@@ -50,10 +50,7 @@ class MainAdapter(
         val TAG = MainAdapter::class.java.simpleName
     }
 
-    private val dispatcher = Executors
-            .newFixedThreadPool(4)
-            .asCoroutineDispatcher()
-    private val coroutineScope = CoroutineScope(dispatcher)
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     private lateinit var binding: ListItemImageBinding
 
@@ -110,7 +107,7 @@ class MainAdapter(
     inner class Holder(val binding: ListItemImageBinding) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(path: String) {
-            binding.viewModel = ItemListBitmapViewModel(dispatcher, coroutineScope, imageRecognizerChannel, path)
+            binding.viewModel = ItemListBitmapViewModel(coroutineScope, imageRecognizerChannel, path)
             binding.lifecycleOwner = lifecycleOwner
         }
 
@@ -121,7 +118,6 @@ class MainAdapter(
     }
 
     class ItemListBitmapViewModel(
-            private val dispatcher: CoroutineDispatcher,
             private val coroutineScope: CoroutineScope,
             private val channel: Channel<ImageRecognizer.Request>,
             private val path: String
