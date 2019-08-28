@@ -28,9 +28,11 @@ import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.keiji.foodgallery.databinding.ActivityMainBinding
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 const val DEFAULT_LIMIT = 50
 
+@ExperimentalCoroutinesApi
 class MainActivity : AppCompatActivity() {
 
     companion object {
@@ -78,7 +80,7 @@ class MainActivity : AppCompatActivity() {
         lifecycle.addObserver(viewModel)
         lifecycle.addObserver(imageRecognizer)
 
-        val adapter = MainAdapter(this, this, viewModel.mediaPathList, imageRecognizer.channel)
+        val adapter = MainAdapter(this, this, imageRecognizer.channel)
         lifecycle.addObserver(adapter)
 
         layoutManager = GridLayoutManager(this, 2)
@@ -93,7 +95,7 @@ class MainActivity : AppCompatActivity() {
 
         viewModel.mediaPathList.observe(this, Observer { mediaPathList ->
             binding.recyclerView.adapter?.let {
-                adapter.notifyDataSetChanged()
+                adapter.setItems(mediaPathList)
             }
         })
     }

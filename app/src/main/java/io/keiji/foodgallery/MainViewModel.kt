@@ -22,18 +22,17 @@ class MainViewModel(
         val mediaRepository: MediaRepository
 ) : ViewModel(), LifecycleObserver {
 
-    val mediaPathList: MutableLiveData<ArrayList<String>> = MutableLiveData<ArrayList<String>>().also {
-        it.value = ArrayList()
-    }
+    private val _mediaPathList: MutableLiveData<ArrayList<String>> = MutableLiveData()
+    val mediaPathList: LiveData<ArrayList<String>>
+        get() = _mediaPathList
 
     fun loadMedias(limit: Int) {
-        val mediaPathListSnapshot = mediaPathList.value
-        mediaPathListSnapshot ?: return
+        val mediaPathListSnapshot = mediaPathList.value ?: ArrayList()
 
         val resultArrayList = mediaRepository.getMediaPathList(mediaPathListSnapshot.size, limit)
 
         mediaPathListSnapshot.addAll(resultArrayList)
-        mediaPathList.value = mediaPathListSnapshot
+        _mediaPathList.value = mediaPathListSnapshot
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)

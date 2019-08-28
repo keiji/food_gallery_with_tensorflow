@@ -22,11 +22,9 @@ import android.os.Debug
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.channels.SendChannel
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.io.IOException
@@ -37,6 +35,7 @@ import java.util.concurrent.Executors
 
 private const val NUM_WORKERS = 4
 
+@ExperimentalCoroutinesApi
 class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     companion object {
@@ -73,7 +72,13 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         //        it.setUseNNAPI(true)
     }
 
-    data class Request(val bitmap: Bitmap, val callbak: Callback)
+    data class Request(val bitmap: Bitmap, val callbak: SendChannel<Float>) {
+        var isCanceled = false
+
+        fun cancel() {
+            isCanceled = true
+        }
+    }
 
     val channel: Channel<Request> = Channel()
 
@@ -95,6 +100,10 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     .order(ByteOrder.nativeOrder())
 
             for (request in channel) {
+                if (request.isCanceled) {
+                    continue
+                }
+
                 val (bitmap, callbak) = request
                 if (bitmap.isRecycled) {
                     continue
@@ -132,7 +141,11 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                 resultBuffer.clear()
                 inputBuffer.clear()
 
-                callbak.onRecognize(confidence)
+                if (request.isCanceled) {
+                    continue
+                }
+
+                callbak.send(confidence)
             }
         }
     }

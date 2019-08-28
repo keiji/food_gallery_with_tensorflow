@@ -28,24 +28,21 @@ import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import io.keiji.foodgallery.databinding.ListItemImageBinding
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import java.util.concurrent.Executors
 
 private const val CONFIDENCE_THRESHOLD = 0.5F
 private const val ALPHA_IS_FOOD = 1.0F
 private const val ALPHA_IS_NOT_FOOD = 0.5F
 
+@ExperimentalCoroutinesApi
 class MainAdapter(
         val context: Context,
         val lifecycleOwner: LifecycleOwner,
-        val mediaPathList: MutableLiveData<ArrayList<String>>,
         val imageRecognizerChannel: Channel<ImageRecognizer.Request>
 ) : RecyclerView.Adapter<MainAdapter.Holder>(), LifecycleObserver {
 
@@ -60,30 +57,49 @@ class MainAdapter(
 
     private lateinit var binding: ListItemImageBinding
 
-    override fun getItemCount(): Int {
-        val mediaPathListSnapshot = mediaPathList.value
-        mediaPathListSnapshot ?: return 0
+    private val mediaPathList = ArrayList<String>()
 
-        return mediaPathListSnapshot.size
+    private class DiffCallback(private val oldList: List<String>, private val newList: List<String>) : DiffUtil.Callback() {
+
+        override fun getOldListSize(): Int = oldList.size
+
+        override fun getNewListSize(): Int = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition] == newList[newItemPosition]
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition] == newList[newItemPosition]
+        }
+    }
+
+    fun setItems(itemList: List<String>) {
+        val diffResult = DiffUtil.calculateDiff(DiffCallback(mediaPathList, itemList))
+        mediaPathList.also {
+            it.clear()
+            it.addAll(itemList)
+        }
+        diffResult.dispatchUpdatesTo(this)
+    }
+
+    override fun getItemCount(): Int {
+        return mediaPathList.size
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        binding = DataBindingUtil.inflate<ListItemImageBinding>(
+        binding = DataBindingUtil.inflate(
                 LayoutInflater.from(context),
                 R.layout.list_item_image,
                 parent,
                 false
-        ).also {
-        }
+        )
 
         return Holder(binding)
     }
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
-        val mediaPathListSnapshot = mediaPathList.value
-        mediaPathListSnapshot ?: return
-
-        holder.bind(mediaPathListSnapshot[position])
+        holder.bind(mediaPathList[position])
     }
 
     override fun onViewRecycled(holder: Holder) {
@@ -113,24 +129,19 @@ class MainAdapter(
         val photoPrediction = MutableLiveData<Float>()
         val progressVisibility = MutableLiveData<Int>()
 
-        private var thumbnailLoadingJob: Job? = null
         private var bitmap: Bitmap? = null
 
-        val recognizerCallback: ImageRecognizer.Callback = object : ImageRecognizer.Callback {
-            override fun onRecognize(confidence: Float) {
-                val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
-                    ALPHA_IS_FOOD
-                } else {
-                    ALPHA_IS_NOT_FOOD
-                }
-                photoPrediction.postValue(alpha)
-                progressVisibility.postValue(View.GONE)
-            }
-        }
+        var thumbnailLoadJob: Job? = null
+        var recognizeRequest: ImageRecognizer.Request? = null
+        val callbackChannel = Channel<Float>()
 
         fun recycle() {
-            thumbnailLoadingJob?.cancel()
+            thumbnailLoadJob?.cancel()
+
+            recognizeRequest?.cancel()
+
             bitmap?.recycle()
+            bitmap = null
         }
 
         @ExperimentalCoroutinesApi
@@ -162,20 +173,29 @@ class MainAdapter(
 
                     progressVisibility.postValue(View.VISIBLE)
 
-                    val myFlow = flow {
-                        bitmap = BitmapFactory.decodeFile(path, options)
-                        bitmap?.let {
-                            emit(it)
+                    thumbnailLoadJob = coroutineScope.launch {
+                        val image = BitmapFactory.decodeFile(path, options)
+                        bitmap = image
+
+                        withContext(Dispatchers.Main) {
+                            imageView.setImageBitmap(image)
                         }
-                    }.flowOn(dispatcher)
-                            .map { bitmap ->
-                                imageView.setImageBitmap(bitmap)
-                                bitmap
-                            }.flowOn(Dispatchers.Main)
-                            .map { bitmap ->
-                                channel.send(ImageRecognizer.Request(bitmap, recognizerCallback))
-                            }
-                    thumbnailLoadingJob = myFlow.launchIn(coroutineScope)
+
+                        recognizeRequest = ImageRecognizer.Request(image, callbackChannel)
+                        channel.send(recognizeRequest!!)
+
+                        val confidence = callbackChannel.receive()
+
+                        val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
+                            ALPHA_IS_FOOD
+                        } else {
+                            ALPHA_IS_NOT_FOOD
+                        }
+                        photoPrediction.postValue(alpha)
+                        progressVisibility.postValue(View.GONE)
+
+                        callbackChannel.close()
+                    }
                 }
             }
         }
