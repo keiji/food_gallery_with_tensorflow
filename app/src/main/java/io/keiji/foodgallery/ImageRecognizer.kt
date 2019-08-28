@@ -19,6 +19,7 @@ limitations under the License.
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.os.Debug
+import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
@@ -131,11 +132,12 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                 inputBuffer.rewind()
                 resultBuffer.rewind()
 
-                val start = Debug.threadCpuTimeNanos()
+                val start = System.nanoTime()
                 tfInference.run(inputBuffer, resultBuffer)
-                resultBuffer.rewind()
+                val elapsed = System.nanoTime() - start
+                Log.d(TAG, "elapsed: $elapsed")
 
-                val elapsed = Debug.threadCpuTimeNanos() - start
+                resultBuffer.rewind()
                 val confidence = resultBuffer.float
 
                 resultBuffer.clear()
