@@ -43,13 +43,11 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_4ch.tflite"
+        private val MODEL_FILE_PATH = "food_model_quant_3ch.tflite"
 
         private val IMAGE_WIDTH = 128
         private val IMAGE_HEIGHT = 128
-        private val IMAGE_CHANNEL = 4
-
-        val IMAGE_BYTES_LENGTH = IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNEL
+        private val IMAGE_CHANNEL = 3
     }
 
     private val dispatcher = Executors
@@ -86,11 +84,10 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     options)
 
             val resizedImageBuffer = ByteBuffer
-                    .allocateDirect(IMAGE_BYTES_LENGTH)
-                    .order(ByteOrder.nativeOrder())
+                    .allocate(IMAGE_WIDTH * IMAGE_WIDTH * 4) // 4 means channel
 
             val inputBuffer = ByteBuffer
-                    .allocateDirect(IMAGE_BYTES_LENGTH * 4)
+                    .allocateDirect(IMAGE_WIDTH * IMAGE_WIDTH * IMAGE_CHANNEL * 4) // 4 means float
                     .order(ByteOrder.nativeOrder())
 
             val resultBuffer = ByteBuffer
@@ -113,9 +110,13 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     scaledBitmap.recycle()
                 }
 
+                resizedImageBuffer.rewind()
+
                 inputBuffer.rewind()
-                for (index in (0..IMAGE_BYTES_LENGTH - 1)) {
-                    inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
+                for (index in (0 until IMAGE_WIDTH * IMAGE_HEIGHT * 4)) { // 4 means channel
+                    if ((index % 4) < 3) {
+                        inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
+                    }
                 }
 
                 inputBuffer.rewind()
@@ -126,7 +127,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                 resultBuffer.rewind()
 
                 val elapsed = Debug.threadCpuTimeNanos() - start
-                val confidence = resultBuffer.getFloat()
+                val confidence = resultBuffer.float
 
                 resultBuffer.clear()
                 inputBuffer.clear()
