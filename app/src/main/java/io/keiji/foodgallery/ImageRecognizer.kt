@@ -110,7 +110,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     continue
                 }
 
-                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, false)
+                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, true)
 
                 resizedImageBuffer.rewind()
                 scaledBitmap.copyPixelsToBuffer(resizedImageBuffer)
