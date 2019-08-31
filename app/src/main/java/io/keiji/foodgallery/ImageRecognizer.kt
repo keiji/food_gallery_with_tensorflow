@@ -48,10 +48,10 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         private val IMAGE_CHANNEL = 3
     }
 
-    private val dispatcher = Executors
+    private val dispatchers = Executors
             .newFixedThreadPool(NUM_WORKERS)
             .asCoroutineDispatcher()
-    private val coroutineScope = CoroutineScope(dispatcher)
+    private val coroutineScope = CoroutineScope(dispatchers)
 
     @Throws(IOException::class)
     private fun loadModelFile(assets: AssetManager, modelFileName: String): ByteBuffer {
@@ -84,7 +84,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     val channel: Channel<Request> = Channel()
 
-    val workers = (1..NUM_WORKERS).map {
+    val pipelines = (0 until NUM_WORKERS).map {
         coroutineScope.launch {
             val tfInference = Interpreter(
                     model,
@@ -159,9 +159,9 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
     fun onDestroy() {
-        workers.map { it.cancel() }
+        pipelines.map { it.cancel() }
         channel.close()
-        dispatcher.close()
+        dispatchers.close()
 
         coroutineScope.cancel()
     }

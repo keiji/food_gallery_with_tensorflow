@@ -144,8 +144,15 @@ class MainAdapter(
             inSampleSize = 2
         }
 
+        val callback = object : ImageRecognizer.Callback {
+            override suspend fun onRecognize(confidence: Float) = withContext(Dispatchers.Main) {
+                setConfidence(confidence)
+            }
+        }
+
         fun startImageLoading(viewModel: ItemListBitmapViewModel,
                               imageViewRef: WeakReference<ImageView>) {
+
             viewModel.apply {
                 bitmap?.let {
                     imageViewRef.get()?.setImageBitmap(it)
@@ -153,12 +160,6 @@ class MainAdapter(
                 }
 
                 progressVisibility.postValue(View.VISIBLE)
-
-                val callback = object : ImageRecognizer.Callback {
-                    override suspend fun onRecognize(confidence: Float) = withContext(Dispatchers.Main) {
-                        setConfidence(confidence)
-                    }
-                }
 
                 thumbnailLoadJob?.cancel()
                 thumbnailLoadJob = coroutineScope.launch {

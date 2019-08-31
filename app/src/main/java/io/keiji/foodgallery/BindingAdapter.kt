@@ -24,5 +24,5 @@ import java.lang.ref.WeakReference
 @UseExperimental(ExperimentalCoroutinesApi::class)
 @BindingAdapter("path")
 fun ImageView.loadImage(viewModel: MainAdapter.ItemListBitmapViewModel) {
-    viewModel.startImageLoading(viewModel, WeakReference(this@loadImage))
+    viewModel.startImageLoading(viewModel, WeakReference(this))
 }
