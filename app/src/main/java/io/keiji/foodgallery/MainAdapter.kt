@@ -128,12 +128,13 @@ class MainAdapter(
 
         var thumbnailLoadJob: Job? = null
         var recognizeRequest: ImageRecognizer.Request? = null
-        val callbackChannel = Channel<Float>()
 
         fun recycle() {
             thumbnailLoadJob?.cancel()
+            thumbnailLoadJob = null
 
             recognizeRequest?.cancel()
+            recognizeRequest = null
 
             bitmap?.recycle()
             bitmap = null
@@ -145,9 +146,6 @@ class MainAdapter(
 
         fun startImageLoading(viewModel: ItemListBitmapViewModel,
                               imageViewRef: WeakReference<ImageView>) {
-            thumbnailLoadJob?.cancel()
-            thumbnailLoadJob = null
-
             viewModel.apply {
                 bitmap?.let {
                     imageViewRef.get()?.setImageBitmap(it)
@@ -156,6 +154,13 @@ class MainAdapter(
 
                 progressVisibility.postValue(View.VISIBLE)
 
+                val callback = object : ImageRecognizer.Callback {
+                    override suspend fun onRecognize(confidence: Float) = withContext(Dispatchers.Main) {
+                        setConfidence(confidence)
+                    }
+                }
+
+                thumbnailLoadJob?.cancel()
                 thumbnailLoadJob = coroutineScope.launch {
                     val image = BitmapFactory.decodeFile(path, options)
                     bitmap = image
@@ -164,22 +169,22 @@ class MainAdapter(
                         imageViewRef.get()?.setImageBitmap(image)
                     }
 
-                    val request = ImageRecognizer.Request(image, callbackChannel)
+                    val request = ImageRecognizer.Request(image, callback)
                     recognizeRequest = request
                     channel.send(request)
-
-                    val confidence = callbackChannel.receive()
-
-                    val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
-                        ALPHA_IS_FOOD
-                    } else {
-                        ALPHA_IS_NOT_FOOD
-                    }
-
-                    photoPrediction.postValue(alpha)
-                    progressVisibility.postValue(View.GONE)
                 }
             }
+        }
+
+        private fun setConfidence(confidence: Float) {
+            val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
+                ALPHA_IS_FOOD
+            } else {
+                ALPHA_IS_NOT_FOOD
+            }
+
+            photoPrediction.postValue(alpha)
+            progressVisibility.postValue(View.GONE)
         }
     }
 }

@@ -18,14 +18,12 @@ limitations under the License.
 
 import android.content.res.AssetManager
 import android.graphics.Bitmap
-import android.os.Debug
 import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.SendChannel
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.io.IOException
@@ -73,7 +71,10 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         //        it.setUseNNAPI(true)
     }
 
-    data class Request(val bitmap: Bitmap, val callbak: SendChannel<Float>) {
+    data class Request(
+            val bitmap: Bitmap,
+            val callbak: Callback
+    ) {
         var isCanceled = false
 
         fun cancel() {
@@ -147,7 +148,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     continue
                 }
 
-                callbak.send(confidence)
+                request.callbak.onRecognize(confidence)
             }
         }
     }
@@ -166,6 +167,6 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
     }
 
     interface Callback {
-        fun onRecognize(confidence: Float)
+        suspend fun onRecognize(confidence: Float)
     }
 }
