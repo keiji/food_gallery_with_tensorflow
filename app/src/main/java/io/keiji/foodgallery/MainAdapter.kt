@@ -23,7 +23,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import androidx.databinding.BindingAdapter
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -33,7 +32,7 @@ import androidx.recyclerview.widget.RecyclerView
 import io.keiji.foodgallery.databinding.ListItemImageBinding
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import java.util.concurrent.Executors
+import java.lang.ref.WeakReference
 
 private const val CONFIDENCE_THRESHOLD = 0.8F
 private const val ALPHA_IS_FOOD = 1.0F
@@ -140,61 +139,47 @@ class MainAdapter(
             bitmap = null
         }
 
-        @ExperimentalCoroutinesApi
-        object ImageViewBindingAdapter {
-            val options: BitmapFactory.Options = BitmapFactory.Options().apply {
-                inSampleSize = 2
-            }
+        val options: BitmapFactory.Options = BitmapFactory.Options().apply {
+            inSampleSize = 2
+        }
 
-            @BindingAdapter("path")
-            @JvmStatic
-            fun loadImage(imageView: ImageView, viewModel: ItemListBitmapViewModel) {
-                viewModel.apply {
-                    val drawable = when {
-                        else -> {
-                            startImageLoading(viewModel, imageView)
-                            null
-                        }
-                    }
-                    imageView.setImageDrawable(drawable)
+        fun startImageLoading(viewModel: ItemListBitmapViewModel,
+                              imageViewRef: WeakReference<ImageView>) {
+            thumbnailLoadJob?.cancel()
+            thumbnailLoadJob = null
+
+            viewModel.apply {
+                bitmap?.let {
+                    imageViewRef.get()?.setImageBitmap(it)
+                    return
                 }
-            }
 
-            private fun startImageLoading(viewModel: ItemListBitmapViewModel, imageView: ImageView) {
-                viewModel.apply {
-                    bitmap?.let {
-                        imageView.setImageBitmap(it)
-                        return
+                progressVisibility.postValue(View.VISIBLE)
+
+                thumbnailLoadJob = coroutineScope.launch {
+                    val image = BitmapFactory.decodeFile(path, options)
+                    bitmap = image
+
+                    withContext(Dispatchers.Main) {
+                        imageViewRef.get()?.setImageBitmap(image)
                     }
 
-                    progressVisibility.postValue(View.VISIBLE)
+                    val request = ImageRecognizer.Request(image, callbackChannel)
+                    recognizeRequest = request
+                    channel.send(request)
 
-                    thumbnailLoadJob = coroutineScope.launch {
-                        val image = BitmapFactory.decodeFile(path, options)
-                        bitmap = image
+                    val confidence = callbackChannel.receive()
 
-                        withContext(Dispatchers.Main) {
-                            imageView.setImageBitmap(image)
-                        }
-
-                        recognizeRequest = ImageRecognizer.Request(image, callbackChannel)
-                        channel.send(recognizeRequest!!)
-
-                        val confidence = callbackChannel.receive()
-
-                        val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
-                            ALPHA_IS_FOOD
-                        } else {
-                            ALPHA_IS_NOT_FOOD
-                        }
-                        photoPrediction.postValue(alpha)
-                        progressVisibility.postValue(View.GONE)
-
-                        callbackChannel.close()
+                    val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
+                        ALPHA_IS_FOOD
+                    } else {
+                        ALPHA_IS_NOT_FOOD
                     }
+
+                    photoPrediction.postValue(alpha)
+                    progressVisibility.postValue(View.GONE)
                 }
             }
         }
-
     }
 }
