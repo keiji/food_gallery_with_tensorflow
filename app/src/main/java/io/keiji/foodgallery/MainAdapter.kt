@@ -35,9 +35,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.Executors
 
-private const val CONFIDENCE_THRESHOLD = 0.5F
+private const val CONFIDENCE_THRESHOLD = 0.8F
 private const val ALPHA_IS_FOOD = 1.0F
-private const val ALPHA_IS_NOT_FOOD = 0.5F
+private const val ALPHA_IS_NOT_FOOD = 0.25F
 
 @ExperimentalCoroutinesApi
 class MainAdapter(
