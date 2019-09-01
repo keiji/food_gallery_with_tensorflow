@@ -71,9 +71,9 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         //        it.setUseNNAPI(true)
     }
 
-    data class Request(
+    class Request(
             val bitmap: Bitmap,
-            val callback: suspend (confidence: Float) -> Unit
+            val callback: suspend (confidence: Float?) -> Unit
     ) {
         var isCanceled = false
 
@@ -102,55 +102,65 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     .order(ByteOrder.nativeOrder())
 
             for (request in channel) {
-                if (request.isCanceled) {
-                    continue
-                }
-
-                val (bitmap, callbak) = request
-                if (bitmap.isRecycled) {
-                    continue
-                }
-
-                val scaledBitmap = Bitmap.createScaledBitmap(bitmap, IMAGE_WIDTH, IMAGE_HEIGHT, true)
-
-                resizedImageBuffer.rewind()
-                scaledBitmap.copyPixelsToBuffer(resizedImageBuffer)
-
-                // https://github.com/CyberAgent/android-gpuimage/issues/24
-                if (scaledBitmap !== bitmap) {
-                    scaledBitmap.recycle()
-                }
-
-                resizedImageBuffer.rewind()
-
-                inputBuffer.rewind()
-                for (index in (0 until IMAGE_WIDTH * IMAGE_HEIGHT * 4)) { // 4 means channel
-                    if ((index % 4) < 3) {
-                        inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
-                    }
-                }
-
-                inputBuffer.rewind()
-                resultBuffer.rewind()
-
-                val start = System.nanoTime()
-                tfInference.run(inputBuffer, resultBuffer)
-                val elapsed = System.nanoTime() - start
-                Log.d(TAG, "elapsed: $elapsed")
-
-                resultBuffer.rewind()
-                val confidence = resultBuffer.float
-
-                resultBuffer.clear()
-                inputBuffer.clear()
-
-                if (request.isCanceled) {
-                    continue
-                }
-
+                val confidence = inference(request,
+                        tfInference,
+                        resizedImageBuffer,
+                        inputBuffer,
+                        resultBuffer)
                 request.callback(confidence)
             }
         }
+    }
+
+    fun inference(request: Request,
+                  tfInference: Interpreter,
+                  resizedImageBuffer: ByteBuffer,
+                  inputBuffer: ByteBuffer,
+                  resultBuffer: ByteBuffer
+    ): Float? {
+        if (request.isCanceled) {
+            return null
+        }
+
+        if (request.bitmap.isRecycled) {
+            return null
+        }
+
+        val scaledBitmap = Bitmap.createScaledBitmap(request.bitmap,
+                IMAGE_WIDTH, IMAGE_HEIGHT, true)
+
+        resizedImageBuffer.rewind()
+        scaledBitmap.copyPixelsToBuffer(resizedImageBuffer)
+
+        // https://github.com/CyberAgent/android-gpuimage/issues/24
+        if (scaledBitmap !== request.bitmap) {
+            scaledBitmap.recycle()
+        }
+
+        resizedImageBuffer.rewind()
+
+        inputBuffer.rewind()
+        for (index in (0 until IMAGE_WIDTH * IMAGE_HEIGHT * 4)) { // 4 means channel
+            if ((index % 4) < 3) {
+                inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
+            }
+        }
+
+        inputBuffer.rewind()
+        resultBuffer.rewind()
+
+        val start = System.nanoTime()
+        tfInference.run(inputBuffer, resultBuffer)
+        val elapsed = System.nanoTime() - start
+        Log.d(TAG, "elapsed: $elapsed")
+
+        resultBuffer.rewind()
+        val confidence = resultBuffer.float
+
+        resultBuffer.clear()
+        inputBuffer.clear()
+
+        return confidence
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)

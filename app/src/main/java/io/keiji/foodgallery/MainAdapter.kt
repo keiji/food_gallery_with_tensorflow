@@ -173,7 +173,11 @@ class MainAdapter(
             }
         }
 
-        suspend fun updateConfidence(confidence: Float) = withContext(Dispatchers.Main) {
+        suspend fun updateConfidence(confidence: Float?) = withContext(Dispatchers.Main) {
+            progressVisibility.postValue(View.GONE)
+
+            confidence ?: return@withContext
+
             val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
                 ALPHA_IS_FOOD
             } else {
@@ -181,7 +185,6 @@ class MainAdapter(
             }
 
             photoPrediction.postValue(alpha)
-            progressVisibility.postValue(View.GONE)
         }
     }
 }
