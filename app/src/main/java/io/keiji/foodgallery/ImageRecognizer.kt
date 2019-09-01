@@ -73,7 +73,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     data class Request(
             val bitmap: Bitmap,
-            val callbak: Callback
+            val callback: suspend (confidence: Float) -> Unit
     ) {
         var isCanceled = false
 
@@ -148,7 +148,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
                     continue
                 }
 
-                request.callbak.onRecognize(confidence)
+                request.callback(confidence)
             }
         }
     }
@@ -164,9 +164,5 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         dispatchers.close()
 
         coroutineScope.cancel()
-    }
-
-    interface Callback {
-        suspend fun onRecognize(confidence: Float)
     }
 }

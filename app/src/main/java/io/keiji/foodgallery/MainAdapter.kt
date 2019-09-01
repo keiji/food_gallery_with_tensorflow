@@ -144,12 +144,6 @@ class MainAdapter(
             inSampleSize = 2
         }
 
-        val callback = object : ImageRecognizer.Callback {
-            override suspend fun onRecognize(confidence: Float) = withContext(Dispatchers.Main) {
-                setConfidence(confidence)
-            }
-        }
-
         fun startImageLoading(viewModel: ItemListBitmapViewModel,
                               imageViewRef: WeakReference<ImageView>) {
 
@@ -170,14 +164,16 @@ class MainAdapter(
                         imageViewRef.get()?.setImageBitmap(image)
                     }
 
-                    val request = ImageRecognizer.Request(image, callback)
+                    val request = ImageRecognizer.Request(image) {
+                        updateConfidence(it)
+                    }
                     recognizeRequest = request
                     channel.send(request)
                 }
             }
         }
 
-        private fun setConfidence(confidence: Float) {
+        suspend fun updateConfidence(confidence: Float) = withContext(Dispatchers.Main) {
             val alpha = if (confidence > CONFIDENCE_THRESHOLD) {
                 ALPHA_IS_FOOD
             } else {
