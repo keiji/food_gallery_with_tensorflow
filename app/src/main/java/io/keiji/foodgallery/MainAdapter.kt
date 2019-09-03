@@ -38,7 +38,6 @@ private const val CONFIDENCE_THRESHOLD = 0.8F
 private const val ALPHA_IS_FOOD = 1.0F
 private const val ALPHA_IS_NOT_FOOD = 0.25F
 
-@ExperimentalCoroutinesApi
 class MainAdapter(
         val context: Context,
         val lifecycleOwner: LifecycleOwner,

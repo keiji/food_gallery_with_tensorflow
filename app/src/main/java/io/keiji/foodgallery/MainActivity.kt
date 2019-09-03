@@ -28,11 +28,9 @@ import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import io.keiji.foodgallery.databinding.ActivityMainBinding
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 const val DEFAULT_LIMIT = 50
 
-@ExperimentalCoroutinesApi
 class MainActivity : AppCompatActivity() {
 
     companion object {

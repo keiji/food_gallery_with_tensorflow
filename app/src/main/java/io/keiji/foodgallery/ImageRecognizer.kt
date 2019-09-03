@@ -22,8 +22,11 @@ import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.io.IOException
@@ -34,7 +37,6 @@ import java.util.concurrent.Executors
 
 private const val NUM_WORKERS = 4
 
-@ExperimentalCoroutinesApi
 class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
 
     companion object {
@@ -142,7 +144,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         inputBuffer.rewind()
         for (index in (0 until IMAGE_WIDTH * IMAGE_HEIGHT * 4)) { // 4 means channel
             if ((index % 4) < 3) {
-                inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
+                inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF) / 255.0F)
             }
         }
 
@@ -161,10 +163,6 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         inputBuffer.clear()
 
         return confidence
-    }
-
-    @OnLifecycleEvent(Lifecycle.Event.ON_CREATE)
-    fun onCreate() {
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_DESTROY)
