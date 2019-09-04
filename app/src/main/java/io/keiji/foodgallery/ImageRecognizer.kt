@@ -43,7 +43,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         val TAG = ImageRecognizer::class.java.simpleName
 
         // https://github.com/keiji/food_gallery_with_tensorflow
-        private val MODEL_FILE_PATH = "food_model_quant_3ch.tflite"
+        private val MODEL_FILE_PATH = "food_model_3ch.tflite"
 
         private val IMAGE_WIDTH = 128
         private val IMAGE_HEIGHT = 128
@@ -144,7 +144,7 @@ class ImageRecognizer(assetManager: AssetManager) : LifecycleObserver {
         inputBuffer.rewind()
         for (index in (0 until IMAGE_WIDTH * IMAGE_HEIGHT * 4)) { // 4 means channel
             if ((index % 4) < 3) {
-                inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF) / 255.0F)
+                inputBuffer.putFloat(resizedImageBuffer[index].toInt().and(0xFF).toFloat())
             }
         }
 
